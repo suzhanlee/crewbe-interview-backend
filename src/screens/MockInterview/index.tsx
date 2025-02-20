@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform, ActivityIndicator, ScrollView } from 'react-native';
 import { Camera, CameraType } from 'expo-camera';
 import { COLORS } from '../../utils/constants';
 import Button from '../../components/common/Button';
 import { api } from '../../api';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import type { MockInterviewScreenNavigationProp } from '../../types/navigation';
+import { AIRLINES, Airline } from '../../constants/airlines';
 
 interface InterviewReport {
   score: number;
   feedback: string;
   improvements: string[];
+  duration: number;
 }
 
 const MockInterviewScreen = () => {
+  const navigation = useNavigation<MockInterviewScreenNavigationProp>();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [camera, setCamera] = useState<Camera | null>(null);
   const [hasCamera, setHasCamera] = useState<boolean>(true);
@@ -19,10 +24,21 @@ const MockInterviewScreen = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [report, setReport] = useState<InterviewReport | null>(null);
   const [isSaved, setIsSaved] = useState(false);
+  const [selectedAirline, setSelectedAirline] = useState<Airline | null>(null);
+  const [showAirlineSelection, setShowAirlineSelection] = useState(false);
+  const [timer, setTimer] = useState(0);
+  const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     checkCameraAvailability();
   }, []);
+
+  // 화면이 포커스를 받을 때마다 상태 초기화
+  useFocusEffect(
+    React.useCallback(() => {
+      resetInterviewState();
+    }, [])
+  );
 
   const checkCameraAvailability = async () => {
     if (Platform.OS === 'web') {
@@ -76,10 +92,34 @@ const MockInterviewScreen = () => {
     }
   };
 
+  // 타이머 시작 함수
+  const startTimer = () => {
+    const interval = setInterval(() => {
+      setTimer((prev) => prev + 1);
+    }, 1000);
+    setTimerInterval(interval);
+  };
+
+  // 타이머 정지 함수
+  const stopTimer = () => {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      setTimerInterval(null);
+    }
+  };
+
+  // 타이머 포맷 함수
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
   const handleInterviewToggle = async () => {
     if (!isInterviewing) {
       setIsInterviewing(true);
     } else {
+      stopTimer();
       setIsInterviewing(false);
       setIsAnalyzing(true);
       
@@ -92,7 +132,8 @@ const MockInterviewScreen = () => {
             "답변 시 시선을 더 일관되게 유지해보세요",
             "중요한 포인트에서 목소리 톤의 변화를 주면 좋겠습니다",
             "긴장된 모습이 보이니 호흡을 조금 더 안정적으로 가져가보세요"
-          ]
+          ],
+          duration: timer
         };
         
         setReport(mockReport);
@@ -132,6 +173,38 @@ const MockInterviewScreen = () => {
     */
   };
 
+  const handleStartInterview = () => {
+    setShowAirlineSelection(true);
+  };
+
+  const handleAirlineSelect = (airline: Airline) => {
+    setSelectedAirline(airline);
+    setShowAirlineSelection(false);
+    setIsInterviewing(true);
+    setTimer(0);
+    startTimer();
+  };
+
+  const resetInterviewState = () => {
+    setIsInterviewing(false);
+    setReport(null);
+    setIsSaved(false);
+    setIsAnalyzing(false);
+    setShowAirlineSelection(false);
+    setSelectedAirline(null);
+    stopTimer();
+    setTimer(0);
+  };
+
+  // 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
+    };
+  }, [timerInterval]);
+
   if (isSaved) {
     return (
       <View style={styles.container}>
@@ -139,9 +212,7 @@ const MockInterviewScreen = () => {
         <Button 
           title="새로운 면접 시작하기" 
           onPress={() => {
-            setIsInterviewing(false);
-            setReport(null);
-            setIsSaved(false);
+            resetInterviewState();
           }} 
         />
       </View>
@@ -163,6 +234,9 @@ const MockInterviewScreen = () => {
         <View style={styles.reportContainer}>
           <Text style={styles.reportTitle}>면접 분석 리포트</Text>
           <Text style={styles.scoreText}>점수: {report.score}점</Text>
+          <Text style={styles.durationText}>
+            총 면접 시간: {formatTime(report.duration)}
+          </Text>
           <Text style={styles.feedbackTitle}>피드백</Text>
           <Text style={styles.feedbackText}>{report.feedback}</Text>
           <Text style={styles.improvementsTitle}>개선사항</Text>
@@ -170,14 +244,74 @@ const MockInterviewScreen = () => {
             <Text key={index} style={styles.improvementItem}>• {item}</Text>
           ))}
         </View>
-        <Button 
-          title="저장하기" 
-          onPress={handleSaveReport} 
-        />
+        <View style={styles.buttonGroup}>
+          <Button 
+            title="저장하기" 
+            onPress={handleSaveReport} 
+          />
+          <View style={styles.buttonSpacing} />
+          <Button 
+            title="홈으로" 
+            onPress={() => {
+              resetInterviewState();
+              navigation.navigate('Home');
+            }} 
+          />
+        </View>
       </View>
     );
   }
 
+  // 항공사 선택 화면
+  if (showAirlineSelection) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.selectionTitle}>항공사를 선택해주세요</Text>
+        <ScrollView style={styles.airlineList}>
+          {AIRLINES.map((airline) => (
+            <TouchableOpacity
+              key={airline.id}
+              style={styles.airlineItem}
+              onPress={() => handleAirlineSelect(airline)}
+            >
+              <Text style={styles.airlineName}>{airline.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // 면접 진행 화면
+  if (isInterviewing) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.timerContainer}>
+            <Text style={styles.timer}>{formatTime(timer)}</Text>
+          </View>
+          <Text style={styles.selectedAirline}>
+            {selectedAirline?.name} 면접 진행 중
+          </Text>
+        </View>
+        <View style={styles.cameraContainer}>
+          <Camera 
+            ref={ref => setCamera(ref)}
+            style={styles.camera} 
+            type={CameraType.front}
+          />
+        </View>
+        <View style={styles.buttonContainer}>
+          <Button 
+            title="종료하기"
+            onPress={handleInterviewToggle} 
+          />
+        </View>
+      </View>
+    );
+  }
+
+  // 초기 화면
   return (
     <View style={styles.container}>
       <View style={styles.cameraContainer}>
@@ -189,8 +323,8 @@ const MockInterviewScreen = () => {
       </View>
       <View style={styles.buttonContainer}>
         <Button 
-          title={isInterviewing ? "종료하기" : "모의 면접 시작하기"} 
-          onPress={handleInterviewToggle} 
+          title="모의 면접 시작하기"
+          onPress={handleStartInterview} 
         />
       </View>
     </View>
@@ -251,6 +385,11 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     marginBottom: 15,
   },
+  durationText: {
+    fontSize: 18,
+    color: COLORS.primary,
+    marginBottom: 15,
+  },
   feedbackTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -280,7 +419,57 @@ const styles = StyleSheet.create({
     color: 'green',
     marginBottom: 30,
     textAlign: 'center',
-  }
+  },
+  buttonGroup: {
+    width: '100%',
+    marginTop: 20,
+    gap: 10,
+  },
+  buttonSpacing: {
+    height: 10,
+  },
+  selectionTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 30,
+    color: COLORS.text,
+  },
+  airlineList: {
+    width: '100%',
+  },
+  airlineItem: {
+    padding: 20,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  airlineName: {
+    fontSize: 18,
+    color: COLORS.text,
+  },
+  header: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  timerContainer: {
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  timer: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#FF0000',
+  },
+  selectedAirline: {
+    fontSize: 18,
+    color: COLORS.text,
+    textAlign: 'center',
+  },
 });
 
 export default MockInterviewScreen; 
