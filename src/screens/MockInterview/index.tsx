@@ -257,6 +257,7 @@ const MockInterviewScreen = () => {
             <Text style={styles.sectionTitle}>면접 결과 요약</Text>
             <Text style={styles.scoreText}>총점: {currentFeedback.totalScore} / 100</Text>
             <Text style={styles.gradeText}>합격 예측 등급: {currentFeedback.grade}</Text>
+            <Text style={styles.durationText}>총 면접 시간: {formatTime(timer)}</Text>
           </View>
 
           <View style={styles.section}>

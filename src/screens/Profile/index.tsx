@@ -104,6 +104,7 @@ const ProfileScreen = () => {
                     <Text style={styles.modalSectionTitle}>면접 결과 요약</Text>
                     <Text style={styles.modalScoreText}>총점: {selectedFeedback.score} / 100</Text>
                     <Text style={styles.modalGradeText}>합격 예측 등급: {selectedFeedback.grade}</Text>
+                    <Text style={styles.modalDurationText}>총 면접 시간: {formatTime(selectedFeedback.duration)}</Text>
                   </View>
 
                   <View style={styles.modalSection}>
@@ -303,6 +304,11 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   modalGradeText: {
+    fontSize: 18,
+    color: COLORS.primary,
+    marginBottom: 15,
+  },
+  modalDurationText: {
     fontSize: 18,
     color: COLORS.primary,
     marginBottom: 15,
