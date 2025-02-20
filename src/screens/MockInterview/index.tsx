@@ -9,7 +9,7 @@ import type { MockInterviewScreenNavigationProp } from '../../types/navigation';
 import { BaseAirline, getRandomQuestion, AIRLINES } from '../../models/Airline';
 import { useInterviews } from '../../contexts/InterviewContext';
 import { useUser } from '../../contexts/UserContext';
-import { getRandomFeedback, FeedbackDetail } from '../../models/InterviewFeedback';
+import { getRandomFeedback, FeedbackDetail, DetailedScore } from '../../models/InterviewFeedback';
 
 interface InterviewReport {
   id: string;
@@ -351,7 +351,7 @@ const MockInterviewScreen = () => {
             style={styles.camera} 
             type={CameraType.front}
             ratio="4:3"
-            autoFocus={Camera.Constants.AutoFocus.on}
+            autoFocus={true}
           />
         </View>
 

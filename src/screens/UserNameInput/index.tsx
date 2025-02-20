@@ -4,11 +4,12 @@ import { COLORS } from '../../utils/constants';
 import Button from '../../components/common/Button';
 import { useUser } from '../../contexts/UserContext';
 import { useNavigation } from '@react-navigation/native';
+import type { RootStackNavigationProp } from '../../types/navigation';
 
 const UserNameInputScreen = () => {
   const [inputName, setInputName] = useState('');
   const { setUsername } = useUser();
-  const navigation = useNavigation();
+  const navigation = useNavigation<RootStackNavigationProp>();
 
   const handleSubmit = () => {
     if (inputName.trim()) {

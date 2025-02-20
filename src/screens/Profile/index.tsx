@@ -79,9 +79,9 @@ const ProfileScreen = () => {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             {selectedFeedback && (
-              <>
+              <ScrollView style={styles.modalScroll}>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>면접 상세 결과</Text>
+                  <Text style={styles.modalTitle}>면접 분석 리포트</Text>
                   <TouchableOpacity 
                     style={styles.closeButton}
                     onPress={() => setShowModal(false)}
@@ -92,30 +92,55 @@ const ProfileScreen = () => {
 
                 <View style={styles.modalBody}>
                   <View style={styles.modalSection}>
-                    <Text style={styles.modalAirline}>{selectedFeedback.airline}</Text>
-                    <Text style={styles.modalDate}>{selectedFeedback.date}</Text>
+                    <Text style={styles.modalSectionTitle}>지원자 정보</Text>
+                    <Text style={styles.modalInfoText}>이름: {selectedFeedback.username}</Text>
+                    <Text style={styles.modalInfoText}>지원 항공사: {selectedFeedback.airline}</Text>
+                    <Text style={styles.modalInfoText}>지원 직무: 객실 승무원</Text>
+                    <Text style={styles.modalInfoText}>면접 일자: {selectedFeedback.date}</Text>
+                    <Text style={styles.modalInfoText}>평가 버전: AI 면접 테스트 V1.0</Text>
                   </View>
 
                   <View style={styles.modalSection}>
-                    <Text style={styles.modalScore}>점수: {selectedFeedback.score}점</Text>
-                    <Text style={styles.modalDuration}>
-                      총 면접 시간: {formatTime(selectedFeedback.duration)}
-                    </Text>
+                    <Text style={styles.modalSectionTitle}>면접 결과 요약</Text>
+                    <Text style={styles.modalScoreText}>총점: {selectedFeedback.score} / 100</Text>
+                    <Text style={styles.modalGradeText}>합격 예측 등급: {selectedFeedback.grade}</Text>
                   </View>
 
                   <View style={styles.modalSection}>
-                    <Text style={styles.modalSubtitle}>피드백</Text>
-                    <Text style={styles.modalFeedback}>{selectedFeedback.feedback}</Text>
+                    <Text style={styles.modalSectionTitle}>전반적인 평가</Text>
+                    <Text style={styles.modalText}>{selectedFeedback.feedback}</Text>
                   </View>
 
                   <View style={styles.modalSection}>
-                    <Text style={styles.modalSubtitle}>개선사항</Text>
+                    <Text style={styles.modalSectionTitle}>세부 평가 결과</Text>
+                    <Text style={styles.modalSubTitle}>음성 정확도 ({selectedFeedback.detailedScores.voiceAccuracy}점)</Text>
+                    <Text style={styles.modalText}>{selectedFeedback.detailedFeedback.voiceAccuracyDetail}</Text>
+                    
+                    <Text style={styles.modalSubTitle}>표정 분석 ({selectedFeedback.detailedScores.expression}점)</Text>
+                    <Text style={styles.modalText}>{selectedFeedback.detailedFeedback.expressionDetail}</Text>
+                    
+                    <Text style={styles.modalSubTitle}>말투 & 속도 ({selectedFeedback.detailedScores.speechPattern}점)</Text>
+                    <Text style={styles.modalText}>{selectedFeedback.detailedFeedback.speechPatternDetail}</Text>
+                    
+                    <Text style={styles.modalSubTitle}>답변 퀄리티 ({selectedFeedback.detailedScores.answerQuality}점)</Text>
+                    <Text style={styles.modalText}>{selectedFeedback.detailedFeedback.answerQualityDetail}</Text>
+                  </View>
+
+                  <View style={styles.modalSection}>
+                    <Text style={styles.modalSectionTitle}>개선사항</Text>
                     {selectedFeedback.improvements.map((item, index) => (
                       <Text key={index} style={styles.modalImprovement}>• {item}</Text>
                     ))}
                   </View>
+
+                  <View style={styles.modalSection}>
+                    <Text style={styles.modalSectionTitle}>추천 조치사항</Text>
+                    {selectedFeedback.recommendedActions.map((item, index) => (
+                      <Text key={index} style={styles.modalRecommendation}>• {item}</Text>
+                    ))}
+                  </View>
                 </View>
-              </>
+              </ScrollView>
             )}
           </View>
         </View>
@@ -260,42 +285,55 @@ const styles = StyleSheet.create({
   modalSection: {
     marginBottom: 20,
   },
-  modalAirline: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 5,
-  },
-  modalDate: {
-    fontSize: 16,
-    color: '#666',
-  },
-  modalScore: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginBottom: 5,
-  },
-  modalDuration: {
-    fontSize: 16,
-    color: COLORS.text,
-  },
-  modalSubtitle: {
+  modalSectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.text,
     marginBottom: 10,
+    color: COLORS.text,
   },
-  modalFeedback: {
+  modalInfoText: {
+    fontSize: 16,
+    color: COLORS.text,
+    marginBottom: 5,
+  },
+  modalScoreText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: COLORS.primary,
+    marginBottom: 15,
+  },
+  modalGradeText: {
+    fontSize: 18,
+    color: COLORS.primary,
+    marginBottom: 15,
+  },
+  modalText: {
     fontSize: 16,
     lineHeight: 24,
     color: COLORS.text,
+    marginBottom: 10,
+  },
+  modalSubTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginTop: 15,
+    marginBottom: 5,
   },
   modalImprovement: {
     fontSize: 16,
     lineHeight: 24,
     color: COLORS.text,
     marginBottom: 5,
+  },
+  modalRecommendation: {
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 5,
+    color: COLORS.text,
+  },
+  modalScroll: {
+    maxHeight: '100%',
   },
 });
 
