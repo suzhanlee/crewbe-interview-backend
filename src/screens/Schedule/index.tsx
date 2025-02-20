@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal } from 'react-native';
+import { Calendar, DateData } from 'react-native-calendars';
 import { COLORS } from '../../utils/constants';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -10,14 +11,39 @@ interface SalaryEntry {
   amount: string;
 }
 
+interface ScheduleEntry {
+  id: string;
+  date: string;
+  title: string;
+  description: string;
+}
+
 const ScheduleScreen = () => {
   const [salaryEntries, setSalaryEntries] = useState<SalaryEntry[]>([]);
   const [showYearPicker, setShowYearPicker] = useState<string | null>(null);
   const [showMonthPicker, setShowMonthPicker] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
 
+  // 일정 관련 state 추가
+  const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newSchedule, setNewSchedule] = useState({
+    title: '',
+    description: '',
+  });
+
+  const [isEditMode, setIsEditMode] = useState(false);  // 수정 모드 상태 추가
+  const [editingSchedule, setEditingSchedule] = useState<ScheduleEntry | null>(null);  // 수정 중인 일정
+
   const years = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear() - 5 + i).toString());
   const months = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
+
+  // 캘린더에 표시할 일정 마커 생성
+  const markedDates = schedules.reduce((acc, schedule) => {
+    acc[schedule.date] = { marked: true, dotColor: COLORS.primary };
+    return acc;
+  }, {} as { [key: string]: { marked: boolean; dotColor: string } });
 
   const addNewEntry = () => {
     const newEntry: SalaryEntry = {
@@ -44,12 +70,151 @@ const ScheduleScreen = () => {
     // 여기에 나중에 서버 저장 로직 추가 가능
   };
 
+  // 일정 추가/수정 함수
+  const handleAddSchedule = () => {
+    if (selectedDate && newSchedule.title) {
+      if (isEditMode && editingSchedule) {
+        // 수정 모드: 기존 일정 업데이트
+        setSchedules(schedules.map(schedule => 
+          schedule.id === editingSchedule.id 
+            ? { ...schedule, title: newSchedule.title, description: newSchedule.description }
+            : schedule
+        ));
+      } else {
+        // 추가 모드: 새 일정 추가
+        const newEntry: ScheduleEntry = {
+          id: Date.now().toString(),
+          date: selectedDate,
+          title: newSchedule.title,
+          description: newSchedule.description,
+        };
+        setSchedules([...schedules, newEntry]);
+      }
+      handleCloseModal();
+    }
+  };
+
+  // 모달 닫기 함수
+  const handleCloseModal = () => {
+    setShowAddModal(false);
+    setNewSchedule({ title: '', description: '' });
+    setIsEditMode(false);
+    setEditingSchedule(null);
+  };
+
+  // 일정 클릭 핸들러
+  const handleScheduleClick = (schedule: ScheduleEntry) => {
+    setSelectedDate(schedule.date);
+    setNewSchedule({
+      title: schedule.title,
+      description: schedule.description,
+    });
+    setIsEditMode(true);
+    setEditingSchedule(schedule);
+    setShowAddModal(true);
+  };
+
+  // 일정 삭제 함수
+  const handleDeleteSchedule = (id: string) => {
+    setSchedules(schedules.filter(schedule => schedule.id !== id));
+  };
+
   return (
     <View style={styles.container}>
       {/* 상단 일정 관리 영역 */}
       <View style={styles.scheduleSection}>
         <Text style={styles.sectionTitle}>일정 관리</Text>
-        {/* 기존 일정 관리 컴포넌트 */}
+        <Calendar
+          style={styles.calendar}
+          markedDates={markedDates}
+          onDayPress={(day: DateData) => {
+            setSelectedDate(day.dateString);
+            setShowAddModal(true);
+          }}
+          theme={{
+            selectedDayBackgroundColor: COLORS.primary,
+            todayTextColor: COLORS.primary,
+            arrowColor: COLORS.primary,
+          }}
+        />
+
+        <ScrollView style={styles.scheduleList}>
+          {schedules
+            .sort((a, b) => a.date.localeCompare(b.date))
+            .map(schedule => (
+              <TouchableOpacity
+                key={schedule.id}
+                style={styles.scheduleItem}
+                onPress={() => handleScheduleClick(schedule)}
+              >
+                <View style={styles.scheduleContent}>
+                  <Text style={styles.scheduleDate}>{schedule.date}</Text>
+                  <Text style={styles.scheduleTitle}>{schedule.title}</Text>
+                  {schedule.description && (
+                    <Text style={styles.scheduleDescription}>{schedule.description}</Text>
+                  )}
+                </View>
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();  // 상위 onPress 이벤트 전파 방지
+                    handleDeleteSchedule(schedule.id);
+                  }}
+                  style={styles.deleteButton}
+                >
+                  <Ionicons name="close-circle" size={24} color="red" />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
+        </ScrollView>
+
+        {/* 일정 추가/수정 모달 */}
+        <Modal
+          visible={showAddModal}
+          transparent
+          animationType="slide"
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>
+                {isEditMode ? '일정 수정' : '일정 추가'}
+              </Text>
+              <Text style={styles.modalDate}>{selectedDate}</Text>
+              
+              <TextInput
+                style={styles.input}
+                placeholder="일정 제목"
+                value={newSchedule.title}
+                onChangeText={(text) => setNewSchedule(prev => ({ ...prev, title: text }))}
+              />
+              
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="상세 내용"
+                value={newSchedule.description}
+                onChangeText={(text) => setNewSchedule(prev => ({ ...prev, description: text }))}
+                multiline
+                numberOfLines={4}
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={handleCloseModal}
+                >
+                  <Text style={styles.buttonText}>취소</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.confirmButton]}
+                  onPress={handleAddSchedule}
+                >
+                  <Text style={styles.buttonText}>
+                    {isEditMode ? '수정' : '추가'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
 
       {/* 하단 급여 관리 영역 */}
@@ -275,6 +440,103 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   unlockButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  calendar: {
+    marginBottom: 20,
+    borderRadius: 10,
+    elevation: 2,
+    backgroundColor: '#fff',
+  },
+  scheduleList: {
+    flex: 1,
+    marginTop: 10,
+  },
+  scheduleItem: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 10,
+    elevation: 2,
+    alignItems: 'center',
+  },
+  scheduleContent: {
+    flex: 1,
+  },
+  scheduleDate: {
+    fontSize: 14,
+    color: COLORS.primary,
+    marginBottom: 5,
+  },
+  scheduleTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 3,
+  },
+  scheduleDescription: {
+    fontSize: 14,
+    color: '#666',
+  },
+  deleteButton: {
+    padding: 5,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 15,
+    width: '90%',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  modalDate: {
+    fontSize: 16,
+    color: COLORS.primary,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 15,
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  cancelButton: {
+    backgroundColor: '#666',
+  },
+  confirmButton: {
+    backgroundColor: COLORS.primary,
+  },
+  buttonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
