@@ -10,9 +10,10 @@ export type MainTabParamList = {
   Home: undefined;
   Profile: undefined;
   Schedule: undefined;
+  MockInterview: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export type UserNameInputScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'UserNameInput'>;
-export type MockInterviewScreenNavigationProp = NativeStackNavigationProp<TabParamList, 'MockInterview'>; 
+export type MockInterviewScreenNavigationProp = NativeStackNavigationProp<MainTabParamList, 'MockInterview'>; 
