@@ -23,6 +23,14 @@
         "backgroundColor": "#ffffff"
       }
     },
-    "platforms": ["ios", "android", "web"]
+    "platforms": ["ios", "android", "web"],
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "앱이 카메라에 접근하는 것을 허용하시겠습니까?"
+        }
+      ]
+    ]
   }
 } 
