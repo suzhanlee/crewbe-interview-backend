@@ -7,6 +7,8 @@ import { api } from '../../api';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { MockInterviewScreenNavigationProp } from '../../types/navigation';
 import { AIRLINES, Airline } from '../../constants/airlines';
+import { useInterviews } from '../../contexts/InterviewContext';
+import { useUser } from '../../contexts/UserContext';
 
 interface InterviewReport {
   score: number;
@@ -28,6 +30,9 @@ const MockInterviewScreen = () => {
   const [showAirlineSelection, setShowAirlineSelection] = useState(false);
   const [timer, setTimer] = useState(0);
   const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(null);
+  const { feedbacks, setFeedbacks } = useInterviews();
+  const { username } = useUser();
+  const [currentReport, setCurrentReport] = useState<InterviewReport | null>(null);
 
   useEffect(() => {
     checkCameraAvailability();
@@ -123,54 +128,34 @@ const MockInterviewScreen = () => {
       setIsInterviewing(false);
       setIsAnalyzing(true);
       
-      // 10초 후에 임시 리포트 데이터 표시
       setTimeout(() => {
-        const mockReport: InterviewReport = {
+        const mockReport = {
+          id: Date.now().toString(),
+          date: new Date().toISOString().split('T')[0],
+          airline: selectedAirline?.name || '',
+          username: username,
           score: 85,
-          feedback: "전반적으로 좋은 면접 태도를 보여주셨습니다. 답변 시 구체적인 예시를 들어 설명하는 점이 인상적이었습니다. 다만, 시선 처리와 목소리 톤에서 약간의 개선이 필요해 보입니다.",
+          feedback: `${username}님, 전반적으로 좋은 면접 태도를 보여주셨습니다...`,
+          duration: timer,
           improvements: [
             "답변 시 시선을 더 일관되게 유지해보세요",
             "중요한 포인트에서 목소리 톤의 변화를 주면 좋겠습니다",
             "긴장된 모습이 보이니 호흡을 조금 더 안정적으로 가져가보세요"
-          ],
-          duration: timer
+          ]
         };
         
+        setCurrentReport(mockReport);
         setReport(mockReport);
         setIsAnalyzing(false);
       }, 10000);
-
-      /* 실제 API 호출 코드는 주석 처리
-      try {
-        const response = await api.post('/interview/analyze', {
-          // 면접 데이터
-        });
-        setReport(response.data);
-      } catch (error) {
-        console.error('분석 실패:', error);
-        Alert.alert('오류', '분석 중 문제가 발생했습니다.');
-      } finally {
-        setIsAnalyzing(false);
-      }
-      */
     }
   };
 
   const handleSaveReport = async () => {
-    // API 호출 없이 바로 저장 완료 처리
-    setIsSaved(true);
-
-    /* 실제 API 호출 코드는 주석 처리
-    try {
-      await api.post('/interview/save', {
-        report
-      });
-      setIsSaved(true);
-    } catch (error) {
-      console.error('저장 실패:', error);
-      Alert.alert('오류', '저장 중 문제가 발생했습니다.');
+    if (currentReport) {
+      setFeedbacks(prev => [...prev, currentReport]);
     }
-    */
+    setIsSaved(true);
   };
 
   const handleStartInterview = () => {
@@ -188,6 +173,7 @@ const MockInterviewScreen = () => {
   const resetInterviewState = () => {
     setIsInterviewing(false);
     setReport(null);
+    setCurrentReport(null);
     setIsSaved(false);
     setIsAnalyzing(false);
     setShowAirlineSelection(false);
