@@ -344,16 +344,21 @@ const MockInterviewScreen = () => {
             {selectedAirline.name} 면접 진행 중
           </Text>
         </View>
+        
         <View style={styles.cameraContainer}>
           <Camera 
             ref={ref => setCamera(ref)}
             style={styles.camera} 
             type={CameraType.front}
+            ratio="4:3"
+            autoFocus={Camera.Constants.AutoFocus.on}
           />
         </View>
+
         <View style={styles.questionContainer}>
           <Text style={styles.questionText}>{currentQuestion}</Text>
         </View>
+
         <View style={styles.buttonContainer}>
           <Button 
             title="종료하기"
@@ -392,15 +397,20 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   cameraContainer: {
-    width: 300,
-    height: 300,
-    borderRadius: 150,
+    width: '100%',
+    aspectRatio: 4/3,
+    borderRadius: 20,
     overflow: 'hidden',
-    marginVertical: 30,
+    marginVertical: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   camera: {
-    width: '100%',
-    height: '100%',
+    flex: 1,
+    aspectRatio: 4/3,
   },
   buttonContainer: {
     width: '100%',
@@ -560,6 +570,12 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: 5,
     color: COLORS.text,
+  },
+  interviewContainer: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    padding: 20,
   },
 });
 
