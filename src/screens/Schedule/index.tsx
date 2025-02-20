@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal 
 import { Calendar, DateData } from 'react-native-calendars';
 import { COLORS } from '../../utils/constants';
 import { Ionicons } from '@expo/vector-icons';
+import { useSchedules } from '../../contexts/ScheduleContext';
 
 interface SalaryEntry {
   id: string;
@@ -19,13 +20,13 @@ interface ScheduleEntry {
 }
 
 const ScheduleScreen = () => {
+  const { schedules, setSchedules } = useSchedules();
   const [salaryEntries, setSalaryEntries] = useState<SalaryEntry[]>([]);
   const [showYearPicker, setShowYearPicker] = useState<string | null>(null);
   const [showMonthPicker, setShowMonthPicker] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
 
   // 일정 관련 state 추가
-  const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
   const [selectedDate, setSelectedDate] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSchedule, setNewSchedule] = useState({
