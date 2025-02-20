@@ -6,15 +6,33 @@ import Button from '../../components/common/Button';
 import { api } from '../../api';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { MockInterviewScreenNavigationProp } from '../../types/navigation';
-import { AIRLINES, Airline } from '../../constants/airlines';
+import { BaseAirline, getRandomQuestion, AIRLINES } from '../../models/Airline';
 import { useInterviews } from '../../contexts/InterviewContext';
 import { useUser } from '../../contexts/UserContext';
+import { getRandomFeedback, FeedbackDetail } from '../../models/InterviewFeedback';
 
 interface InterviewReport {
+  id: string;
+  date: string;
+  airline: string;
+  username: string;
   score: number;
   feedback: string;
-  improvements: string[];
   duration: number;
+  improvements: string[];
+  grade: string;
+  detailedScores: DetailedScore;
+  voiceAnalysis: string;
+  expressionAnalysis: string;
+  speechAnalysis: string;
+  answerAnalysis: string;
+  detailedFeedback: {
+    voiceAccuracyDetail: string;
+    expressionDetail: string;
+    speechPatternDetail: string;
+    answerQualityDetail: string;
+  };
+  recommendedActions: string[];
 }
 
 const MockInterviewScreen = () => {
@@ -24,15 +42,15 @@ const MockInterviewScreen = () => {
   const [hasCamera, setHasCamera] = useState<boolean>(true);
   const [isInterviewing, setIsInterviewing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [report, setReport] = useState<InterviewReport | null>(null);
   const [isSaved, setIsSaved] = useState(false);
-  const [selectedAirline, setSelectedAirline] = useState<Airline | null>(null);
+  const [selectedAirline, setSelectedAirline] = useState<BaseAirline | null>(null);
   const [showAirlineSelection, setShowAirlineSelection] = useState(false);
   const [timer, setTimer] = useState(0);
   const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(null);
   const { feedbacks, setFeedbacks } = useInterviews();
   const { username } = useUser();
-  const [currentReport, setCurrentReport] = useState<InterviewReport | null>(null);
+  const [currentFeedback, setCurrentFeedback] = useState<FeedbackDetail | null>(null);
+  const [currentQuestion, setCurrentQuestion] = useState<string>('');
 
   useEffect(() => {
     checkCameraAvailability();
@@ -129,55 +147,60 @@ const MockInterviewScreen = () => {
       setIsAnalyzing(true);
       
       setTimeout(() => {
-        const mockReport = {
-          id: Date.now().toString(),
-          date: new Date().toISOString().split('T')[0],
-          airline: selectedAirline?.name || '',
-          username: username,
-          score: 85,
-          feedback: `${username}님, 전반적으로 좋은 면접 태도를 보여주셨습니다...`,
-          duration: timer,
-          improvements: [
-            "답변 시 시선을 더 일관되게 유지해보세요",
-            "중요한 포인트에서 목소리 톤의 변화를 주면 좋겠습니다",
-            "긴장된 모습이 보이니 호흡을 조금 더 안정적으로 가져가보세요"
-          ]
-        };
-        
-        setCurrentReport(mockReport);
-        setReport(mockReport);
+        const feedback = getRandomFeedback(selectedAirline?.name || '', username);
+        setCurrentFeedback(feedback);
         setIsAnalyzing(false);
-      }, 10000);
+      }, 3000);
     }
   };
 
   const handleSaveReport = async () => {
-    if (currentReport) {
-      setFeedbacks(prev => [...prev, currentReport]);
+    if (currentFeedback) {
+      const report: InterviewReport = {
+        id: Date.now().toString(),
+        date: currentFeedback.interviewDate,
+        airline: currentFeedback.airline,
+        username: currentFeedback.candidateName,
+        score: currentFeedback.totalScore,
+        feedback: currentFeedback.overallEvaluation,
+        duration: timer,
+        improvements: currentFeedback.improvements,
+        grade: currentFeedback.grade,
+        detailedScores: currentFeedback.detailedScores,
+        voiceAnalysis: currentFeedback.voiceAnalysis,
+        expressionAnalysis: currentFeedback.expressionAnalysis,
+        speechAnalysis: currentFeedback.speechAnalysis,
+        answerAnalysis: currentFeedback.answerAnalysis,
+        detailedFeedback: currentFeedback.detailedFeedback,
+        recommendedActions: currentFeedback.recommendedActions
+      };
+      
+      setFeedbacks(prev => [...prev, report]);
+      setIsSaved(true);
     }
-    setIsSaved(true);
   };
 
   const handleStartInterview = () => {
     setShowAirlineSelection(true);
   };
 
-  const handleAirlineSelect = (airline: Airline) => {
+  const handleAirlineSelect = (airline: BaseAirline) => {
     setSelectedAirline(airline);
     setShowAirlineSelection(false);
     setIsInterviewing(true);
     setTimer(0);
     startTimer();
+    const randomQuestion = airline.questions[Math.floor(Math.random() * airline.questions.length)];
+    setCurrentQuestion(randomQuestion);
   };
 
   const resetInterviewState = () => {
     setIsInterviewing(false);
-    setReport(null);
-    setCurrentReport(null);
     setIsSaved(false);
     setIsAnalyzing(false);
     setShowAirlineSelection(false);
     setSelectedAirline(null);
+    setCurrentFeedback(null);
     stopTimer();
     setTimer(0);
   };
@@ -199,6 +222,7 @@ const MockInterviewScreen = () => {
           title="새로운 면접 시작하기" 
           onPress={() => {
             resetInterviewState();
+            setShowAirlineSelection(true);
           }} 
         />
       </View>
@@ -214,22 +238,62 @@ const MockInterviewScreen = () => {
     );
   }
 
-  if (report) {
+  if (currentFeedback) {
     return (
       <View style={styles.container}>
-        <View style={styles.reportContainer}>
+        <ScrollView style={styles.reportContainer}>
           <Text style={styles.reportTitle}>면접 분석 리포트</Text>
-          <Text style={styles.scoreText}>점수: {report.score}점</Text>
-          <Text style={styles.durationText}>
-            총 면접 시간: {formatTime(report.duration)}
-          </Text>
-          <Text style={styles.feedbackTitle}>피드백</Text>
-          <Text style={styles.feedbackText}>{report.feedback}</Text>
-          <Text style={styles.improvementsTitle}>개선사항</Text>
-          {report.improvements.map((item, index) => (
-            <Text key={index} style={styles.improvementItem}>• {item}</Text>
-          ))}
-        </View>
+          
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>지원자 정보</Text>
+            <Text style={styles.infoText}>이름: {currentFeedback.candidateName}</Text>
+            <Text style={styles.infoText}>지원 항공사: {currentFeedback.airline}</Text>
+            <Text style={styles.infoText}>지원 직무: {currentFeedback.position}</Text>
+            <Text style={styles.infoText}>면접 일자: {currentFeedback.interviewDate}</Text>
+            <Text style={styles.infoText}>평가 버전: {currentFeedback.version}</Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>면접 결과 요약</Text>
+            <Text style={styles.scoreText}>총점: {currentFeedback.totalScore} / 100</Text>
+            <Text style={styles.gradeText}>합격 예측 등급: {currentFeedback.grade}</Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>전반적인 평가</Text>
+            <Text style={styles.sectionText}>{currentFeedback.overallEvaluation}</Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>세부 평가 결과</Text>
+            <Text style={styles.subTitle}>음성 정확도 ({currentFeedback.detailedScores.voiceAccuracy}점)</Text>
+            <Text style={styles.sectionText}>{currentFeedback.detailedFeedback.voiceAccuracyDetail}</Text>
+            
+            <Text style={styles.subTitle}>표정 분석 ({currentFeedback.detailedScores.expression}점)</Text>
+            <Text style={styles.sectionText}>{currentFeedback.detailedFeedback.expressionDetail}</Text>
+            
+            <Text style={styles.subTitle}>말투 & 속도 ({currentFeedback.detailedScores.speechPattern}점)</Text>
+            <Text style={styles.sectionText}>{currentFeedback.detailedFeedback.speechPatternDetail}</Text>
+            
+            <Text style={styles.subTitle}>답변 퀄리티 ({currentFeedback.detailedScores.answerQuality}점)</Text>
+            <Text style={styles.sectionText}>{currentFeedback.detailedFeedback.answerQualityDetail}</Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>개선사항</Text>
+            {currentFeedback.improvements.map((item, index) => (
+              <Text key={index} style={styles.improvementItem}>• {item}</Text>
+            ))}
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>추천 조치사항</Text>
+            {currentFeedback.recommendedActions.map((item, index) => (
+              <Text key={index} style={styles.recommendationItem}>• {item}</Text>
+            ))}
+          </View>
+        </ScrollView>
+
         <View style={styles.buttonGroup}>
           <Button 
             title="저장하기" 
@@ -256,7 +320,7 @@ const MockInterviewScreen = () => {
         <ScrollView style={styles.airlineList}>
           {AIRLINES.map((airline) => (
             <TouchableOpacity
-              key={airline.id}
+              key={airline.name}
               style={styles.airlineItem}
               onPress={() => handleAirlineSelect(airline)}
             >
@@ -269,7 +333,7 @@ const MockInterviewScreen = () => {
   }
 
   // 면접 진행 화면
-  if (isInterviewing) {
+  if (isInterviewing && selectedAirline) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
@@ -277,7 +341,7 @@ const MockInterviewScreen = () => {
             <Text style={styles.timer}>{formatTime(timer)}</Text>
           </View>
           <Text style={styles.selectedAirline}>
-            {selectedAirline?.name} 면접 진행 중
+            {selectedAirline.name} 면접 진행 중
           </Text>
         </View>
         <View style={styles.cameraContainer}>
@@ -286,6 +350,9 @@ const MockInterviewScreen = () => {
             style={styles.camera} 
             type={CameraType.front}
           />
+        </View>
+        <View style={styles.questionContainer}>
+          <Text style={styles.questionText}>{currentQuestion}</Text>
         </View>
         <View style={styles.buttonContainer}>
           <Button 
@@ -371,33 +438,28 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     marginBottom: 15,
   },
+  gradeText: {
+    fontSize: 18,
+    color: COLORS.primary,
+    marginBottom: 15,
+  },
   durationText: {
     fontSize: 18,
     color: COLORS.primary,
     marginBottom: 15,
   },
-  feedbackTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: COLORS.text,
-  },
-  feedbackText: {
-    fontSize: 16,
-    lineHeight: 24,
+  section: {
     marginBottom: 20,
-    color: COLORS.text,
   },
-  improvementsTitle: {
+  sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
     color: COLORS.text,
   },
-  improvementItem: {
+  sectionText: {
     fontSize: 16,
     lineHeight: 24,
-    marginBottom: 5,
     color: COLORS.text,
   },
   successText: {
@@ -455,6 +517,49 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: COLORS.text,
     textAlign: 'center',
+  },
+  questionContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    padding: 20,
+    borderRadius: 10,
+    marginVertical: 20,
+    width: '100%',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  questionText: {
+    fontSize: 18,
+    color: COLORS.text,
+    textAlign: 'center',
+    lineHeight: 24,
+    fontWeight: '500',
+  },
+  improvementItem: {
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 5,
+    color: COLORS.text,
+  },
+  infoText: {
+    fontSize: 16,
+    color: COLORS.text,
+    marginBottom: 5,
+  },
+  subTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginTop: 15,
+    marginBottom: 5,
+  },
+  recommendationItem: {
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 5,
+    color: COLORS.text,
   },
 });
 
