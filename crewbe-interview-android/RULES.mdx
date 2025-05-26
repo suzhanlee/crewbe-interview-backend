@@ -1,0 +1,88 @@
+# CrewBe Interview Android 프로젝트 규칙
+
+## 프로젝트 구조
+
+```
+crewbe-interview-android/
+├── src/
+│   ├── api/         # API 통신 관련 로직
+│   ├── components/  # 재사용 가능한 UI 컴포넌트
+│   ├── contexts/    # React Context 관련 파일
+│   ├── models/      # 데이터 모델 및 타입 정의
+│   ├── screens/     # 화면 컴포넌트
+│   ├── types/       # TypeScript 타입 정의
+│   └── utils/       # 유틸리티 함수
+├── App.tsx          # 앱의 진입점
+└── package.json     # 프로젝트 의존성 관리
+```
+
+## 네비게이션 구조
+
+현재 앱은 다음과 같은 네비게이션 구조를 가지고 있습니다:
+
+### Root Stack
+- UserNameInput: 사용자 이름 입력 화면
+- MainTabs: 메인 탭 네비게이션
+
+### Main Tabs
+- Home: 홈 화면
+- Profile: 프로필 화면
+- Schedule: 일정 화면
+- MockInterview: 모의 면접 화면
+
+## 코딩 규칙
+
+### 1. 파일 구조
+- 각 기능별로 적절한 디렉토리에 파일을 위치시킵니다.
+- 컴포넌트는 `components/` 디렉토리에 위치합니다.
+- 화면 컴포넌트는 `screens/` 디렉토리에 위치합니다.
+- 타입 정의는 `types/` 디렉토리에 위치합니다.
+
+### 2. 네이밍 컨벤션
+- 컴포넌트 파일: PascalCase (예: `MockInterviewScreen.tsx`)
+- 유틸리티 파일: camelCase (예: `formatDate.ts`)
+- 타입 정의 파일: camelCase (예: `navigation.ts`)
+- 컴포넌트 이름: PascalCase
+- 함수/변수: camelCase
+- 상수: UPPER_SNAKE_CASE
+
+### 3. 타입스크립트 규칙
+- 모든 컴포넌트는 명시적인 타입 정의를 가져야 합니다.
+- Props 인터페이스는 컴포넌트 파일 내에 정의합니다.
+- 공통으로 사용되는 타입은 `types/` 디렉토리에 정의합니다.
+
+### 4. 컴포넌트 작성 규칙
+- 함수형 컴포넌트를 사용합니다.
+- Props는 인터페이스로 정의합니다.
+- 컴포넌트는 가능한 작고 재사용 가능하게 만듭니다.
+- 상태 관리는 Context API를 사용합니다.
+
+### 5. 스타일링 규칙
+- StyleSheet.create를 사용하여 스타일을 정의합니다.
+- 공통 스타일은 utils 디렉토리에 정의합니다.
+- 컴포넌트별 스타일은 해당 컴포넌트 파일 내에 정의합니다.
+
+### 6. API 통신 규칙
+- API 관련 로직은 `api/` 디렉토리에 위치합니다.
+- 각 API 엔드포인트별로 파일을 분리합니다.
+- API 응답 타입을 명시적으로 정의합니다.
+
+### 7. 상태 관리 규칙
+- 전역 상태는 Context API를 사용합니다.
+- Context는 `contexts/` 디렉토리에 위치합니다.
+- 각 Context는 단일 책임을 가집니다.
+
+### 8. 에러 처리
+- API 호출 시 적절한 에러 처리를 구현합니다.
+- 사용자에게 적절한 에러 메시지를 표시합니다.
+- 개발 중 발생하는 에러는 콘솔에 로깅합니다.
+
+### 9. 성능 최적화
+- React.memo를 적절히 사용하여 불필요한 리렌더링을 방지합니다.
+- useCallback과 useMemo를 적절히 사용합니다.
+- 큰 리스트는 FlatList를 사용하여 렌더링합니다.
+
+### 10. 테스트
+- 컴포넌트 테스트는 각 컴포넌트 디렉토리 내에 작성합니다.
+- 유틸리티 함수 테스트는 `__tests__` 디렉토리에 작성합니다.
+- 테스트 파일은 `.test.ts` 또는 `.test.tsx` 확장자를 사용합니다. 
