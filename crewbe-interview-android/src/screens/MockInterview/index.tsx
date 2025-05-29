@@ -11,6 +11,21 @@ import { useInterviews } from '../../contexts/InterviewContext';
 import { useUser } from '../../contexts/UserContext';
 import { getRandomFeedback, FeedbackDetail, DetailedScore } from '../../models/InterviewFeedback';
 
+// 웹 전용 임포트 (조건부)
+let useRecorder: any = null;
+let PRESIGNED_PUT_URL: string = '';
+
+if (Platform.OS === 'web') {
+  try {
+    const webModules = require('../../hooks/useRecorder');
+    useRecorder = webModules.useRecorder;
+    const constants = require('../../constants');
+    PRESIGNED_PUT_URL = constants.PRESIGNED_PUT_URL;
+  } catch (e) {
+    console.warn('웹 모듈 로드 실패:', e);
+  }
+}
+
 interface InterviewReport {
   id: string;
   date: string;
@@ -52,6 +67,9 @@ const MockInterviewScreen = () => {
   const [currentFeedback, setCurrentFeedback] = useState<FeedbackDetail | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<string>('');
 
+  // 웹 환경에서만 녹화 훅 사용
+  const webRecorder = Platform.OS === 'web' && useRecorder ? useRecorder() : null;
+
   useEffect(() => {
     checkCameraAvailability();
   }, []);
@@ -71,7 +89,7 @@ const MockInterviewScreen = () => {
         setHasCamera(hasVideoDevice);
         
         if (hasVideoDevice) {
-          requestCameraPermission();
+          setHasPermission(true);
         } else {
           setHasPermission(false);
         }
@@ -98,7 +116,6 @@ const MockInterviewScreen = () => {
             {
               text: '설정으로 이동',
               onPress: () => {
-                // 설정으로 이동하는 로직
                 console.log('설정으로 이동');
               },
             },
@@ -141,10 +158,19 @@ const MockInterviewScreen = () => {
   const handleInterviewToggle = async () => {
     if (!isInterviewing) {
       setIsInterviewing(true);
+      // 웹에서 녹화 시작
+      if (Platform.OS === 'web' && webRecorder) {
+        await webRecorder.start();
+      }
     } else {
       stopTimer();
       setIsInterviewing(false);
       setIsAnalyzing(true);
+      
+      // 웹에서 녹화 중단 및 업로드
+      if (Platform.OS === 'web' && webRecorder) {
+        await webRecorder.stop();
+      }
       
       setTimeout(() => {
         const feedback = getRandomFeedback(selectedAirline?.name || '', username);
@@ -335,6 +361,83 @@ const MockInterviewScreen = () => {
 
   // 면접 진행 화면
   if (isInterviewing && selectedAirline) {
+    if (Platform.OS === 'web' && webRecorder) {
+      // 웹 환경에서의 녹화 화면
+      return (
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <View style={styles.timerContainer}>
+              <Text style={styles.timer}>{formatTime(timer)}</Text>
+            </View>
+            <Text style={styles.selectedAirline}>
+              {selectedAirline.name} 면접 진행 중 (녹화 중)
+            </Text>
+          </View>
+          
+          <View style={styles.webCameraContainer}>
+            {webRecorder.stream && (
+              <video
+                autoPlay
+                muted
+                playsInline
+                style={{
+                  width: '100%',
+                  maxWidth: '640px',
+                  height: 'auto',
+                  backgroundColor: '#000',
+                  borderRadius: 8,
+                  border: '2px solid #34C759'
+                }}
+                ref={(video) => {
+                  if (video && webRecorder.stream) {
+                    video.srcObject = webRecorder.stream;
+                  }
+                }}
+              />
+            )}
+            
+            {/* 녹화 상태 표시 */}
+            <View style={styles.recordingStatus}>
+              <Text style={styles.recordingText}>
+                🔴 녹화 중 {webRecorder.isUploading && '- 업로드 중...'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.questionContainer}>
+            <Text style={styles.questionText}>{currentQuestion}</Text>
+          </View>
+
+          {/* 웹 로그 표시 */}
+          {webRecorder.logs && webRecorder.logs.length > 0 && (
+            <View style={styles.webLogContainer}>
+              <Text style={styles.logTitle}>📋 녹화 로그</Text>
+              <View style={styles.logContent}>
+                <Text style={styles.logText}>
+                  {webRecorder.logs.slice(-3).join('\n')}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {webRecorder.error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>❌ {webRecorder.error}</Text>
+            </View>
+          )}
+
+          <View style={styles.buttonContainer}>
+            <Button 
+              title={webRecorder.isUploading ? "업로드 중..." : "종료하기"}
+              onPress={handleInterviewToggle}
+              disabled={webRecorder.isUploading}
+            />
+          </View>
+        </View>
+      );
+    }
+    
+    // React Native 환경에서의 기존 카메라 화면
     return (
       <View style={styles.container}>
         <View style={styles.header}>
@@ -417,12 +520,23 @@ const styles = StyleSheet.create({
     width: '100%',
     marginTop: 20,
   },
+  errorContainer: {
+    width: '100%',
+    marginTop: 20,
+    padding: 20,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
   errorText: {
-    color: 'red',
     fontSize: 16,
-    marginBottom: 20,
+    color: '#FF3B30',
     textAlign: 'center',
-    lineHeight: 24,
+    fontWeight: '500',
   },
   loadingText: {
     marginTop: 20,
@@ -577,6 +691,60 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     padding: 20,
+  },
+  webCameraContainer: {
+    width: '100%',
+    aspectRatio: 4/3,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginVertical: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  recordingStatus: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  recordingText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FF0000',
+  },
+  webLogContainer: {
+    width: '100%',
+    marginTop: 20,
+    padding: 20,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  logTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: COLORS.text,
+  },
+  logContent: {
+    flex: 1,
+  },
+  logText: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: COLORS.text,
   },
 });
 
