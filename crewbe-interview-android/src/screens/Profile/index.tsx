@@ -4,11 +4,15 @@ import { COLORS } from '../../utils/constants';
 import { useInterviews } from '../../contexts/InterviewContext';
 import { InterviewFeedback } from '../../contexts/InterviewContext';
 import { useUser } from '../../contexts/UserContext';
+import ProfileEdit from '../ProfileEdit';
+import { ProfileData } from '../../types/profile';
 
 const ProfileScreen = () => {
   const { feedbacks } = useInterviews();
   const [selectedFeedback, setSelectedFeedback] = useState<InterviewFeedback | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const { username } = useUser();
 
   const formatTime = (seconds: number) => {
@@ -22,6 +26,10 @@ const ProfileScreen = () => {
     setShowModal(true);
   };
 
+  const handleProfileSave = (data: ProfileData) => {
+    setProfileData(data);
+  };
+
   return (
     <ScrollView style={styles.container}>
       {/* 프로필 헤더 섹션 */}
@@ -29,7 +37,32 @@ const ProfileScreen = () => {
         <View style={styles.profileImage}>
           <Text style={styles.profileImageText}>프로필</Text>
         </View>
-        <Text style={styles.name}>{username}</Text>
+        <Text style={styles.name}>{profileData?.name || username}</Text>
+        
+        {/* 프로필 편집 버튼 */}
+        <TouchableOpacity 
+          style={styles.editButton}
+          onPress={() => setShowEditModal(true)}
+        >
+          <Text style={styles.editButtonText}>✏️ 프로필 편집</Text>
+        </TouchableOpacity>
+
+        {/* 프로필 정보 미리보기 */}
+        {profileData && (
+          <View style={styles.profilePreview}>
+            <Text style={styles.previewText}>
+              {profileData.gender && `${profileData.gender} • `}
+              {profileData.age && `${profileData.age}세 • `}
+              {profileData.university && profileData.university}
+            </Text>
+            {profileData.videoUri && (
+              <Text style={styles.mediaStatus}>📹 비디오 업로드됨</Text>
+            )}
+            {profileData.photoUri && (
+              <Text style={styles.mediaStatus}>📸 사진 업로드됨</Text>
+            )}
+          </View>
+        )}
       </View>
 
       {/* 면접 피드백 섹션 */}
@@ -146,6 +179,14 @@ const ProfileScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {/* 프로필 편집 모달 */}
+      <ProfileEdit
+        visible={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        onSave={handleProfileSave}
+        initialData={profileData || undefined}
+      />
     </ScrollView>
   );
 };
@@ -340,6 +381,37 @@ const styles = StyleSheet.create({
   },
   modalScroll: {
     maxHeight: '100%',
+  },
+  editButton: {
+    padding: 10,
+    backgroundColor: COLORS.primary,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  editButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  profilePreview: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  previewText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  mediaStatus: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 5,
   },
 });
 

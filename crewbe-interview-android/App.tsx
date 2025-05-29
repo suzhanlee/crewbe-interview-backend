@@ -5,7 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from './src/utils/constants';
-import { RootStackParamList } from './src/types/navigation';
+import { RootStackParamList, MainTabParamList } from './src/types/navigation';
 import { ScheduleProvider } from './src/contexts/ScheduleContext';
 import { InterviewProvider } from './src/contexts/InterviewContext';
 import { UserProvider } from './src/contexts/UserContext';
@@ -16,7 +16,7 @@ import ScheduleScreen from './src/screens/Schedule';
 import ProfileScreen from './src/screens/Profile';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createBottomTabNavigator<TabParamList>();
+const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const TabNavigator = () => (
   <Tab.Navigator
