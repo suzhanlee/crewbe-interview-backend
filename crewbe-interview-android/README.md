@@ -26,7 +26,20 @@ npm install
 yarn install
 ```
 
-3. 개발 서버 실행
+3. 환경변수 설정
+```bash
+# .env.example을 복사하여 .env 파일 생성
+cp .env.example .env
+
+# .env 파일에 실제 AWS 정보 입력
+# AWS_ACCESS_KEY_ID=your_actual_access_key
+# AWS_SECRET_ACCESS_KEY=your_actual_secret_key
+# AWS_REGION=ap-northeast-2
+# AWS_S3_BUCKET=your-profile-bucket-name
+# AWS_S3_RECORDING_BUCKET=your-recording-bucket-name
+```
+
+4. 개발 서버 실행
 ```bash
 npm start
 # 또는
