@@ -21,9 +21,8 @@ export default {
       permissions: [
         "CAMERA",
         "RECORD_AUDIO",
-        "DETECT_SCREEN_CAPTURE",
         "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "DETECT_SCREEN_CAPTURE"
       ],
       adaptiveIcon: {
         backgroundColor: "#ffffff"
@@ -36,12 +35,7 @@ export default {
       "web"
     ],
     plugins: [
-      [
-        "expo-camera",
-        {
-          cameraPermission: "앱이 카메라에 접근하는 것을 허용하시겠습니까?"
-        }
-      ],
+      "expo-camera",
       [
         "expo-image-picker",
         {

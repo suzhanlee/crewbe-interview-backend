@@ -1,3 +1,5 @@
+import Constants from 'expo-constants';
+
 export const COLORS = {
   primary: '#007AFF',
   secondary: '#5AC8FA', 
@@ -11,14 +13,25 @@ export const COLORS = {
   white: '#FFFFFF',
 };
 
-// AWS S3 Pre-Signed PUT URL (임시 하드코딩) - 실제로는 백엔드에서 동적 생성 필요
-export const PRESIGNED_PUT_URL = "https://flight-attendant-recordings.s3.ap-northeast-2.amazonaws.com/videos/interview-{timestamp}.webm?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...";
+// .env 파일에서 S3 설정 가져오기
+const AWS_S3_RECORDING_BUCKET = Constants.expoConfig?.extra?.AWS_S3_RECORDING_BUCKET;
+const AWS_REGION = Constants.expoConfig?.extra?.AWS_REGION || 'ap-northeast-2';
 
-// S3 버킷 정보
-export const S3_BUCKETS = {
-  PROFILES: 'flight-attendant-profiles',      // 프로필 사진/비디오
-  RECORDINGS: 'flight-attendant-recordings'   // 면접 녹화 파일
+// S3 업로드 설정
+export const S3_CONFIG = {
+  BUCKET: AWS_S3_RECORDING_BUCKET || 'crewbe-video-uploads',
+  REGION: AWS_REGION,
 };
+
+// S3 키 생성 함수
+export const generateS3Key = (): string => {
+  const timestamp = Date.now();
+  const randomId = Math.random().toString(36).substring(2, 15);
+  return `videos/interview-${timestamp}-${randomId}.webm`;
+};
+
+// AWS S3 Pre-Signed PUT URL (임시 하드코딩 - 실제로는 서버에서 생성해야 함)
+export const PRESIGNED_PUT_URL = `https://${S3_CONFIG.BUCKET}.s3.${S3_CONFIG.REGION}.amazonaws.com/videos/test-video.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...`;
 
 // MediaRecorder 설정
 export const RECORDER_CONFIG = {

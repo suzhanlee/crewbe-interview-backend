@@ -1,0 +1,82 @@
+# Crewbe Interview Android 프로젝트 규칙
+
+## 1. 프로젝트 구조
+
+```
+crewbe-interview-android/
+├── src/
+│   ├── types/         # TypeScript 타입 정의
+│   ├── components/    # 재사용 가능한 컴포넌트
+│   ├── screens/       # 화면 컴포넌트
+│   ├── navigation/    # 네비게이션 관련 로직
+│   └── utils/         # 유틸리티 함수
+├── App.tsx            # 앱의 진입점
+├── app.json          # Expo 설정
+└── package.json      # 프로젝트 의존성 관리
+```
+
+## 2. 네비게이션 규칙
+
+### 2.1 스택 구조
+- RootStack: 앱의 최상위 네비게이션 스택
+  - UserNameInput: 사용자 이름 입력 화면
+  - MainTabs: 메인 탭 네비게이션
+
+### 2.2 탭 구조
+- Home: 홈 화면
+- Profile: 프로필 화면
+- Schedule: 일정 화면
+- MockInterview: 모의 면접 화면
+
+## 3. 코딩 컨벤션
+
+### 3.1 TypeScript
+- 모든 컴포넌트는 TypeScript로 작성
+- 타입 정의는 `src/types` 디렉토리에 위치
+- 네비게이션 타입은 `navigation.ts`에서 관리
+
+### 3.2 컴포넌트
+- 컴포넌트는 함수형 컴포넌트 사용
+- Props는 명시적인 타입 정의 필수
+- 재사용 가능한 컴포넌트는 `src/components`에 위치
+
+### 3.3 네이밍 컨벤션
+- 컴포넌트: PascalCase (예: `UserNameInput`)
+- 함수/변수: camelCase (예: `handleSubmit`)
+- 타입/인터페이스: PascalCase (예: `RootStackParamList`)
+- 상수: UPPER_SNAKE_CASE (예: `MAX_RETRY_COUNT`)
+
+## 4. 상태 관리
+- React Navigation을 통한 화면 상태 관리
+- 필요한 경우 Context API 사용
+- 복잡한 상태는 상태 관리 라이브러리 고려
+
+## 5. 스타일링
+- StyleSheet API 사용
+- 공통 스타일은 별도 파일로 분리
+- 테마 관련 상수는 중앙 집중식으로 관리
+
+## 6. 테스트
+- 컴포넌트 단위 테스트 작성
+- 네비게이션 플로우 테스트
+- 사용자 인터랙션 테스트
+
+## 7. 성능 최적화
+- 불필요한 리렌더링 방지
+- 이미지 최적화
+- 메모리 누수 방지
+
+## 8. 접근성
+- 적절한 접근성 레이블 사용
+- 키보드 네비게이션 지원
+- 색상 대비 준수
+
+## 9. 버전 관리
+- 의미 있는 커밋 메시지 사용
+- 브랜치 전략 준수
+- PR 리뷰 필수
+
+## 10. 문서화
+- 주요 컴포넌트 문서화
+- API 문서 유지
+- README 업데이트 
