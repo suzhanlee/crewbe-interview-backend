@@ -29,6 +29,10 @@ export const startTranscriptionJob = async (
     const mediaUri = `s3://${BUCKETS.VIDEO}/${s3Key}`;
     const outputS3Uri = `s3://${BUCKETS.ANALYSIS}/transcriptions/`;
 
+    // 터미널 로깅 강화
+    console.log('🎤 [AWS-STT]', `STT 작업 시작: ${jobName}`);
+    console.log('🎤 [AWS-STT]', `입력 파일: ${mediaUri}`);
+    
     logCallback(`🎤 ==============================`);
     logCallback(`🎤 Amazon Transcribe STT 시작`);
     logCallback(`🎤 ==============================`);
@@ -62,6 +66,7 @@ export const startTranscriptionJob = async (
     logCallback(`🚀 AWS Transcribe API 호출 중...`);
     await transcribeService.startTranscriptionJob(params).promise();
     
+    console.log('✅ [AWS-STT]', `STT 작업 요청 완료: ${jobName}`);
     logCallback(`✅ STT 작업 요청 완료: ${jobName}`);
     logCallback(`⏳ 작업 처리 시작됨 (완료까지 수 분 소요)`);
     logCallback(`📊 예상 출력: ${outputS3Uri}${jobName}.json`);
@@ -69,6 +74,7 @@ export const startTranscriptionJob = async (
     return jobName;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+    console.error('💥 [AWS-STT]', `STT 작업 시작 실패: ${errorMessage}`);
     logCallback(`💥 STT 작업 시작 실패: ${errorMessage}`);
     
     if (error instanceof Error) {
@@ -94,6 +100,7 @@ export const startFaceDetection = async (
       },
     };
 
+    console.log('👤 [AWS-FACE]', `얼굴 감지 작업 시작: ${s3Key}`);
     logCallback(`👤 ===============================`);
     logCallback(`👤 Amazon Rekognition 얼굴 감지 시작`);
     logCallback(`👤 ===============================`);
@@ -117,6 +124,7 @@ export const startFaceDetection = async (
     const response = await rekognitionService.startFaceDetection(params).promise();
     const jobId = response.JobId!;
     
+    console.log('✅ [AWS-FACE]', `Face Detection 작업 완료: ${jobId}`);
     logCallback(`✅ Face Detection 작업 요청 완료`);
     logCallback(`🆔 작업 ID: ${jobId}`);
     logCallback(`⏳ 비디오 분석 시작됨 (프레임별 얼굴 감지)`);
@@ -125,6 +133,7 @@ export const startFaceDetection = async (
     return jobId;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+    console.error('💥 [AWS-FACE]', `Face Detection 실패: ${errorMessage}`);
     logCallback(`💥 Face Detection 작업 시작 실패: ${errorMessage}`);
     
     if (error instanceof Error) {
@@ -149,6 +158,7 @@ export const startSegmentDetection = async (
       },
     };
 
+    console.log('🎭 [AWS-SEGMENT]', `세그먼트 감지 작업 시작: ${s3Key}`);
     logCallback(`🎭 ==================================`);
     logCallback(`🎭 Amazon Rekognition 세그먼트 감지 시작`);
     logCallback(`🎭 ==================================`);
@@ -172,6 +182,7 @@ export const startSegmentDetection = async (
     const response = await rekognitionService.startSegmentDetection(params).promise();
     const jobId = response.JobId!;
     
+    console.log('✅ [AWS-SEGMENT]', `Segment Detection 작업 완료: ${jobId}`);
     logCallback(`✅ Segment Detection 작업 요청 완료`);
     logCallback(`🆔 작업 ID: ${jobId}`);
     logCallback(`⏳ 비디오 세그먼트 분석 시작됨`);
@@ -180,6 +191,7 @@ export const startSegmentDetection = async (
     return jobId;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+    console.error('💥 [AWS-SEGMENT]', `Segment Detection 실패: ${errorMessage}`);
     logCallback(`💥 Segment Detection 작업 시작 실패: ${errorMessage}`);
     
     if (error instanceof Error) {
@@ -307,6 +319,7 @@ export const pollAnalysisResults = async (
   jobs: AnalysisJobs,
   logCallback: (message: string) => void
 ): Promise<AnalysisResults> => {
+  console.log('⏳ [POLLING]', '분석 결과 폴링 시작');
   logCallback(`⏳ =============================`);
   logCallback(`⏳ 분석 결과 폴링 시작`);
   logCallback(`⏳ =============================`);
@@ -325,6 +338,7 @@ export const pollAnalysisResults = async (
         pollCount++;
         const elapsedMinutes = ((Date.now() - startTime) / 1000 / 60).toFixed(1);
         
+        console.log('🔄 [POLLING]', `상태 확인 #${pollCount} (경과: ${elapsedMinutes}분)`);
         logCallback(`🔄 상태 확인 #${pollCount} (경과: ${elapsedMinutes}분)`);
         
         // 모든 작업 상태 확인
@@ -333,6 +347,9 @@ export const pollAnalysisResults = async (
           checkFaceDetectionStatus(jobs.faceDetectionJobId),
           checkSegmentDetectionStatus(jobs.segmentDetectionJobId),
         ]);
+        
+        // 터미널에 상태 로깅
+        console.log('📊 [STATUS]', `STT: ${sttStatus.status}, Face: ${faceStatus.status}, Segment: ${segmentStatus.status}`);
         
         // 상태 로깅
         logCallback(`📊 현재 상태:`);
@@ -370,6 +387,7 @@ export const pollAnalysisResults = async (
           
           const totalTime = ((Date.now() - startTime) / 1000 / 60).toFixed(1);
           
+          console.log('🎉 [COMPLETED]', `모든 분석 작업 완료! (${totalTime}분 소요)`);
           logCallback(`🎉 =============================`);
           logCallback(`🎉 모든 분석 작업 완료!`);
           logCallback(`🎉 =============================`);
@@ -378,12 +396,14 @@ export const pollAnalysisResults = async (
           
           // 결과 로깅
           if (sttStatus.outputUri) {
+            console.log('📝 [STT-RESULT]', sttStatus.outputUri);
             logCallback(`📝 STT JSON: ${sttStatus.outputUri}`);
             logCallback(`   🕐 STT 완료 시간: ${sttStatus.completionTime}`);
           }
           
           if (faceStatus.faces) {
             const faceCount = Array.isArray(faceStatus.faces) ? faceStatus.faces.length : 0;
+            console.log('👤 [FACE-RESULT]', `${faceCount} faces found`);
             logCallback(`👤 Face detections: ${faceCount} faces found`);
             if (faceCount > 0) {
               logCallback(`   📊 첫 번째 얼굴 정보: ${JSON.stringify(faceStatus.faces[0]).substring(0, 100)}...`);
@@ -392,12 +412,14 @@ export const pollAnalysisResults = async (
           
           if (segmentStatus.segments) {
             const segmentCount = Array.isArray(segmentStatus.segments) ? segmentStatus.segments.length : 0;
+            console.log('🎭 [SEGMENT-RESULT]', `${segmentCount} segments found`);
             logCallback(`🎭 Segments: ${segmentCount} segments found`);
             if (segmentCount > 0) {
               logCallback(`   📊 첫 번째 세그먼트: ${JSON.stringify(segmentStatus.segments[0]).substring(0, 100)}...`);
             }
           }
           
+          console.log('🏆 [ANALYSIS]', 'Analysis Done');
           logCallback(`🏆 Analysis Done`);
           
           resolve({
@@ -409,6 +431,7 @@ export const pollAnalysisResults = async (
           clearInterval(pollInterval);
           
           const errorMsg = `분석 작업 실패 - STT: ${sttStatus.status}, Face: ${faceStatus.status}, Segment: ${segmentStatus.status}`;
+          console.error('💥 [FAILED]', errorMsg);
           logCallback(`💥 ${errorMsg}`);
           
           // 실패 세부사항 로깅
@@ -431,6 +454,7 @@ export const pollAnalysisResults = async (
       } catch (error) {
         clearInterval(pollInterval);
         const errorMessage = error instanceof Error ? error.message : '폴링 중 오류 발생';
+        console.error('💥 [POLLING-ERROR]', errorMessage);
         logCallback(`💥 폴링 오류: ${errorMessage}`);
         
         if (error instanceof Error) {

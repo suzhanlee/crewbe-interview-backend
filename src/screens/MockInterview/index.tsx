@@ -11,20 +11,8 @@ import { useInterviews } from '../../contexts/InterviewContext';
 import { useUser } from '../../contexts/UserContext';
 import { getRandomFeedback, FeedbackDetail, DetailedScore } from '../../models/InterviewFeedback';
 
-// 웹 전용 임포트 (조건부)
-let useRecorder: any = null;
-let PRESIGNED_PUT_URL: string = '';
-
-if (Platform.OS === 'web') {
-  try {
-    const webModules = require('../../hooks/useRecorder');
-    useRecorder = webModules.useRecorder;
-    const constants = require('../../constants');
-    PRESIGNED_PUT_URL = constants.PRESIGNED_PUT_URL;
-  } catch (e) {
-    console.warn('웹 모듈 로드 실패:', e);
-  }
-}
+// 모든 플랫폼에서 useRecorder 임포트
+import { useRecorder } from '../../hooks/useRecorder';
 
 interface InterviewReport {
   id: string;
@@ -67,8 +55,8 @@ const MockInterviewScreen = () => {
   const [currentFeedback, setCurrentFeedback] = useState<FeedbackDetail | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<string>('');
 
-  // 웹 환경에서만 녹화 훅 사용
-  const webRecorder = Platform.OS === 'web' && useRecorder ? useRecorder() : null;
+  // 모든 플랫폼에서 녹화 훅 사용 (로깅 포함)
+  const recorder = useRecorder();
 
   useEffect(() => {
     checkCameraAvailability();
@@ -122,26 +110,44 @@ const MockInterviewScreen = () => {
   };
 
   const handleInterviewToggle = async () => {
+    console.log('🎯 [INTERVIEW-TOGGLE]', `면접 상태 전환: isInterviewing=${isInterviewing}`);
+    
     if (!isInterviewing) {
+      console.log('▶️ [INTERVIEW-START]', '면접 시작 프로세스 시작');
       setIsInterviewing(true);
-      // 웹에서 녹화 시작
-      if (Platform.OS === 'web' && webRecorder) {
-        await webRecorder.start();
+      
+      // 타이머 시작
+      startTimer();
+      console.log('⏰ [TIMER]', '면접 타이머 시작');
+      
+      // 모든 플랫폼에서 녹화 시작 (웹: MediaRecorder, 모바일: 시뮬레이션)
+      try {
+        await recorder.start();
+        console.log('✅ [INTERVIEW-START]', '면접 녹화/시뮬레이션 시작 완료');
+      } catch (error) {
+        console.error('💥 [INTERVIEW-START]', '면접 시작 실패:', error);
       }
     } else {
+      console.log('⏹️ [INTERVIEW-STOP]', '면접 종료 프로세스 시작');
       stopTimer();
       setIsInterviewing(false);
       setIsAnalyzing(true);
+      console.log('⏰ [TIMER]', '면접 타이머 중단');
       
-      // 웹에서 녹화 중단 및 업로드
-      if (Platform.OS === 'web' && webRecorder) {
-        await webRecorder.stop();
+      // 모든 플랫폼에서 녹화 중단 및 처리
+      try {
+        await recorder.stop();
+        console.log('✅ [INTERVIEW-STOP]', '면접 종료 처리 완료');
+      } catch (error) {
+        console.error('💥 [INTERVIEW-STOP]', '면접 종료 실패:', error);
       }
       
       setTimeout(() => {
+        console.log('📊 [FEEDBACK]', '면접 피드백 생성 중');
         const feedback = getRandomFeedback(selectedAirline?.name || '', username);
         setCurrentFeedback(feedback);
         setIsAnalyzing(false);
+        console.log('✅ [FEEDBACK]', '면접 피드백 생성 완료');
       }, 3000);
     }
   };
@@ -177,13 +183,26 @@ const MockInterviewScreen = () => {
   };
 
   const handleAirlineSelect = (airline: BaseAirline) => {
+    console.log('✈️ [AIRLINE-SELECT]', `항공사 선택: ${airline.name}`);
     setSelectedAirline(airline);
     setShowAirlineSelection(false);
     setIsInterviewing(true);
     setTimer(0);
     startTimer();
+    
     const randomQuestion = airline.questions[Math.floor(Math.random() * airline.questions.length)];
     setCurrentQuestion(randomQuestion);
+    
+    console.log('❓ [QUESTION]', `면접 질문 설정: ${randomQuestion.substring(0, 50)}...`);
+    console.log('⏰ [TIMER]', '면접 타이머 시작');
+    console.log('🚀 [INTERVIEW]', '면접 진행 화면으로 전환');
+    
+    // 녹화 시작
+    recorder.start().then(() => {
+      console.log('✅ [RECORDING]', '녹화/시뮬레이션 시작 완료');
+    }).catch((error) => {
+      console.error('💥 [RECORDING]', '녹화 시작 실패:', error);
+    });
   };
 
   const resetInterviewState = () => {
@@ -327,21 +346,21 @@ const MockInterviewScreen = () => {
 
   // 면접 진행 화면
   if (isInterviewing && selectedAirline) {
-    if (Platform.OS === 'web' && webRecorder) {
-      // 웹 환경에서의 녹화 화면
-      return (
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <View style={styles.timerContainer}>
-              <Text style={styles.timer}>{formatTime(timer)}</Text>
-            </View>
-            <Text style={styles.selectedAirline}>
-              {selectedAirline.name} 면접 진행 중 (녹화 중)
-            </Text>
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.timerContainer}>
+            <Text style={styles.timer}>{formatTime(timer)}</Text>
           </View>
-          
+          <Text style={styles.selectedAirline}>
+            {selectedAirline.name} 면접 진행 중
+          </Text>
+        </View>
+        
+        {/* 플랫폼별 카메라 표시 */}
+        {Platform.OS === 'web' ? (
           <View style={styles.webCameraContainer}>
-            {webRecorder.stream && (
+            {recorder.stream && (
               <video
                 autoPlay
                 muted
@@ -355,79 +374,22 @@ const MockInterviewScreen = () => {
                   border: '2px solid #34C759'
                 }}
                 ref={(video) => {
-                  if (video && webRecorder.stream) {
-                    video.srcObject = webRecorder.stream;
+                  if (video && recorder.stream) {
+                    video.srcObject = recorder.stream;
                   }
                 }}
               />
             )}
-            
-            {/* 녹화 상태 표시 */}
-            <View style={styles.recordingStatus}>
-              <Text style={styles.recordingText}>
-                🔴 녹화 중 {webRecorder.isUploading && '- 업로드 중...'}
-              </Text>
-            </View>
           </View>
-
-          <View style={styles.questionContainer}>
-            <Text style={styles.questionText}>{currentQuestion}</Text>
-          </View>
-
-          {/* 웹 로그 표시 - 전체 로그를 ScrollView로 */}
-          <View style={styles.webLogContainer}>
-            <Text style={styles.logTitle}>
-              📋 면접 로그 {webRecorder.isAnalyzing && '(분석 중...)'}
-            </Text>
-            <ScrollView style={styles.logScrollView} showsVerticalScrollIndicator={true}>
-              <Text style={styles.logText}>
-                {webRecorder.logs.join('\n')}
-              </Text>
-            </ScrollView>
-          </View>
-
-          {webRecorder.error && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>❌ {webRecorder.error}</Text>
-            </View>
-          )}
-
-          <View style={styles.buttonContainer}>
-            <Button 
-              title={
-                webRecorder.isUploading 
-                  ? "업로드 중..." 
-                  : webRecorder.isAnalyzing 
-                    ? "분석 중..." 
-                    : "종료하기"
-              }
-              onPress={handleInterviewToggle}
-              disabled={webRecorder.isUploading || webRecorder.isAnalyzing}
+        ) : (
+          <View style={styles.cameraContainer}>
+            <CameraView 
+              ref={ref => setCamera(ref)}
+              style={styles.camera} 
+              facing="front"
             />
           </View>
-        </View>
-      );
-    }
-    
-    // React Native 환경에서의 기존 카메라 화면
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.timerContainer}>
-            <Text style={styles.timer}>{formatTime(timer)}</Text>
-          </View>
-          <Text style={styles.selectedAirline}>
-            {selectedAirline.name} 면접 진행 중
-          </Text>
-        </View>
-        
-        <View style={styles.cameraContainer}>
-          <CameraView 
-            ref={ref => setCamera(ref)}
-            style={styles.camera} 
-            facing="front"
-          />
-        </View>
+        )}
 
         <View style={styles.questionContainer}>
           <Text style={styles.questionText}>{currentQuestion}</Text>
@@ -435,8 +397,15 @@ const MockInterviewScreen = () => {
 
         <View style={styles.buttonContainer}>
           <Button 
-            title="종료하기"
-            onPress={handleInterviewToggle} 
+            title={
+              recorder.isUploading 
+                ? "업로드 중..." 
+                : recorder.isAnalyzing 
+                  ? "분석 중..." 
+                  : "종료하기"
+            }
+            onPress={handleInterviewToggle}
+            disabled={recorder.isUploading || recorder.isAnalyzing}
           />
         </View>
       </View>
