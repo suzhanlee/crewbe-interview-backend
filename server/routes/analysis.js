@@ -1,6 +1,9 @@
 const express = require('express');
 const AWS = require('aws-sdk');
 
+// 새로운 로깅 시스템 임포트
+const { logger, apiLogger } = require('../utils/logger');
+
 // AWS 설정
 const transcribe = new AWS.TranscribeService();
 const rekognition = new AWS.Rekognition();
@@ -10,28 +13,41 @@ const router = express.Router();
 
 // 면접 분석 시작 엔드포인트
 router.post('/start', async (req, res) => {
+  const startTime = Date.now();
   try {
     const { s3Key, bucket } = req.body;
     
     if (!s3Key) {
+      logger.warn('🧠 분석 시작 실패 - S3 키 누락', {
+        requestId: req.requestId
+      });
+      
       return res.status(400).json({
         success: false,
         error: 'S3 키가 필요합니다',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        requestId: req.requestId
       });
     }
 
-    console.log('🧠 [ANALYSIS] 면접 분석 시작');
-    console.log('🧠 [ANALYSIS]   - S3 키:', s3Key);
-    console.log('🧠 [ANALYSIS]   - 버킷:', bucket || 'flight-attendant-recordings');
-
     const bucketName = bucket || process.env.AWS_S3_RECORDING_BUCKET || 'flight-attendant-recordings';
+    const analysisTypes = ['STT', 'FaceDetection', 'SegmentDetection'];
+    
+    // 분석 시작 로깅
+    apiLogger.analysis.start(s3Key, analysisTypes, req.requestId);
+    
     const analysisResults = {};
 
     // 1. STT (Speech-to-Text) 작업 시작
     try {
       const sttJobName = `interview-stt-${Date.now()}`;
-      console.log('🎤 [STT] Transcribe 작업 시작:', sttJobName);
+      
+      logger.info('🎤 STT 작업 시작 시도', {
+        requestId: req.requestId,
+        jobName: sttJobName,
+        s3Key,
+        bucket: bucketName
+      });
 
       const transcribeParams = {
         TranscriptionJobName: sttJobName,
@@ -43,16 +59,38 @@ router.post('/start', async (req, res) => {
         OutputBucketName: 'crewbe-analysis-results',
       };
 
+      // AWS Transcribe 호출 로깅
+      apiLogger.aws.start('Transcribe', 'startTranscriptionJob', transcribeParams, req.requestId);
+      
+      const awsStartTime = Date.now();
       const sttResult = await transcribe.startTranscriptionJob(transcribeParams).promise();
+      const awsDuration = Date.now() - awsStartTime;
+      
       analysisResults.stt = {
         jobId: sttJobName,
         status: 'IN_PROGRESS',
         jobName: sttResult.TranscriptionJob.TranscriptionJobName
       };
       
-      console.log('✅ [STT] Transcribe 작업 시작됨:', sttJobName);
+      // AWS 성공 로깅
+      apiLogger.aws.success('Transcribe', 'startTranscriptionJob', {
+        jobName: sttResult.TranscriptionJob.TranscriptionJobName,
+        status: sttResult.TranscriptionJob.TranscriptionJobStatus
+      }, req.requestId, awsDuration);
+      
+      // 분석 작업 생성 로깅
+      apiLogger.analysis.jobCreated('STT', sttJobName, req.requestId);
+      
     } catch (sttError) {
-      console.error('💥 [STT] Transcribe 작업 시작 실패:', sttError);
+      logger.error('💥 STT 작업 시작 실패', {
+        requestId: req.requestId,
+        error: sttError.message,
+        code: sttError.code,
+        stack: sttError.stack
+      });
+      
+      apiLogger.analysis.failed('STT', 'N/A', sttError, req.requestId);
+      
       analysisResults.stt = {
         status: 'FAILED',
         error: sttError.message
@@ -61,7 +99,11 @@ router.post('/start', async (req, res) => {
 
     // 2. 얼굴 감지 작업 시작
     try {
-      console.log('👤 [FACE] Rekognition 얼굴 감지 시작');
+      logger.info('👤 얼굴 감지 작업 시작 시도', {
+        requestId: req.requestId,
+        s3Key,
+        bucket: bucketName
+      });
 
       const faceDetectionParams = {
         Video: {
@@ -73,15 +115,36 @@ router.post('/start', async (req, res) => {
         FaceAttributes: 'ALL'
       };
 
+      // AWS Rekognition 호출 로깅
+      apiLogger.aws.start('Rekognition', 'startFaceDetection', faceDetectionParams, req.requestId);
+      
+      const awsStartTime = Date.now();
       const faceResult = await rekognition.startFaceDetection(faceDetectionParams).promise();
+      const awsDuration = Date.now() - awsStartTime;
+      
       analysisResults.faceDetection = {
         jobId: faceResult.JobId,
         status: 'IN_PROGRESS'
       };
       
-      console.log('✅ [FACE] 얼굴 감지 작업 시작됨:', faceResult.JobId);
+      // AWS 성공 로깅
+      apiLogger.aws.success('Rekognition', 'startFaceDetection', {
+        jobId: faceResult.JobId
+      }, req.requestId, awsDuration);
+      
+      // 분석 작업 생성 로깅
+      apiLogger.analysis.jobCreated('FaceDetection', faceResult.JobId, req.requestId);
+      
     } catch (faceError) {
-      console.error('💥 [FACE] 얼굴 감지 작업 시작 실패:', faceError);
+      logger.error('💥 얼굴 감지 작업 시작 실패', {
+        requestId: req.requestId,
+        error: faceError.message,
+        code: faceError.code,
+        stack: faceError.stack
+      });
+      
+      apiLogger.analysis.failed('FaceDetection', 'N/A', faceError, req.requestId);
+      
       analysisResults.faceDetection = {
         status: 'FAILED',
         error: faceError.message
@@ -90,7 +153,11 @@ router.post('/start', async (req, res) => {
 
     // 3. 감정/세그먼트 분석 작업 시작
     try {
-      console.log('😊 [EMOTION] Rekognition 감정 분석 시작');
+      logger.info('🎬 세그먼트 감지 작업 시작 시도', {
+        requestId: req.requestId,
+        s3Key,
+        bucket: bucketName
+      });
 
       const segmentDetectionParams = {
         Video: {
@@ -102,22 +169,54 @@ router.post('/start', async (req, res) => {
         SegmentTypes: ['TECHNICAL_CUE', 'SHOT']
       };
 
+      // AWS Rekognition 호출 로깅
+      apiLogger.aws.start('Rekognition', 'startSegmentDetection', segmentDetectionParams, req.requestId);
+      
+      const awsStartTime = Date.now();
       const segmentResult = await rekognition.startSegmentDetection(segmentDetectionParams).promise();
+      const awsDuration = Date.now() - awsStartTime;
+      
       analysisResults.segmentDetection = {
         jobId: segmentResult.JobId,
         status: 'IN_PROGRESS'
       };
       
-      console.log('✅ [EMOTION] 감정 분석 작업 시작됨:', segmentResult.JobId);
+      // AWS 성공 로깅
+      apiLogger.aws.success('Rekognition', 'startSegmentDetection', {
+        jobId: segmentResult.JobId
+      }, req.requestId, awsDuration);
+      
+      // 분석 작업 생성 로깅
+      apiLogger.analysis.jobCreated('SegmentDetection', segmentResult.JobId, req.requestId);
+      
     } catch (emotionError) {
-      console.error('💥 [EMOTION] 감정 분석 작업 시작 실패:', emotionError);
+      logger.error('💥 세그먼트 감지 작업 시작 실패', {
+        requestId: req.requestId,
+        error: emotionError.message,
+        code: emotionError.code,
+        stack: emotionError.stack
+      });
+      
+      apiLogger.analysis.failed('SegmentDetection', 'N/A', emotionError, req.requestId);
+      
       analysisResults.segmentDetection = {
         status: 'FAILED',
         error: emotionError.message
       };
     }
 
-    console.log('🎉 [ANALYSIS] 모든 분석 작업 시작 완료');
+    const totalDuration = Date.now() - startTime;
+    
+    logger.info('🎉 모든 분석 작업 시작 완료', {
+      requestId: req.requestId,
+      s3Key,
+      bucket: bucketName,
+      successfulJobs: Object.keys(analysisResults).filter(key => 
+        analysisResults[key].status === 'IN_PROGRESS'
+      ).length,
+      totalJobs: Object.keys(analysisResults).length,
+      totalDuration: `${totalDuration}ms`
+    });
 
     res.json({
       success: true,
@@ -125,33 +224,51 @@ router.post('/start', async (req, res) => {
       s3Key: s3Key,
       bucket: bucketName,
       analysisJobs: analysisResults,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      requestId: req.requestId
     });
 
   } catch (error) {
-    console.error('💥 [ANALYSIS] 분석 시작 실패:', error);
+    const duration = Date.now() - startTime;
+    
+    logger.error('💥 분석 시작 전체 실패', {
+      requestId: req.requestId,
+      error: error.message,
+      stack: error.stack,
+      duration: `${duration}ms`
+    });
+    
     res.status(500).json({
       success: false,
       error: '분석 시작 실패',
       message: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      requestId: req.requestId
     });
   }
 });
 
 // 분석 상태 확인 엔드포인트
 router.get('/status/:jobType/:jobId', async (req, res) => {
+  const startTime = Date.now();
   try {
     const { jobType, jobId } = req.params;
     
-    console.log(`🔍 [${jobType.toUpperCase()}] 작업 상태 확인:`, jobId);
+    // 상태 확인 시작 로깅
+    apiLogger.analysis.statusCheck(jobType, jobId, 'CHECKING', req.requestId);
 
     let result;
     let status;
 
     switch (jobType.toLowerCase()) {
       case 'stt':
+        // AWS Transcribe 상태 확인 로깅
+        apiLogger.aws.start('Transcribe', 'getTranscriptionJob', { TranscriptionJobName: jobId }, req.requestId);
+        
+        const awsStartTime1 = Date.now();
         result = await transcribe.getTranscriptionJob({ TranscriptionJobName: jobId }).promise();
+        const awsDuration1 = Date.now() - awsStartTime1;
+        
         status = {
           jobId: jobId,
           status: result.TranscriptionJob.TranscriptionJobStatus,
@@ -161,54 +278,126 @@ router.get('/status/:jobType/:jobId', async (req, res) => {
         
         if (result.TranscriptionJob.TranscriptionJobStatus === 'COMPLETED') {
           status.transcript = result.TranscriptionJob.Transcript;
+          // 완료 로깅
+          apiLogger.analysis.completed('STT', jobId, awsDuration1, req.requestId);
         }
+        
+        // AWS 성공 로깅
+        apiLogger.aws.success('Transcribe', 'getTranscriptionJob', {
+          status: result.TranscriptionJob.TranscriptionJobStatus
+        }, req.requestId, awsDuration1);
+        
         break;
 
       case 'face':
+        // AWS Rekognition 얼굴 감지 상태 확인 로깅
+        apiLogger.aws.start('Rekognition', 'getFaceDetection', { JobId: jobId }, req.requestId);
+        
+        const awsStartTime2 = Date.now();
         result = await rekognition.getFaceDetection({ JobId: jobId }).promise();
+        const awsDuration2 = Date.now() - awsStartTime2;
+        
         status = {
           jobId: jobId,
           status: result.JobStatus,
           videoMetadata: result.VideoMetadata,
           faceDetections: result.Faces ? result.Faces.slice(0, 5) : [] // 처음 5개만
         };
+        
+        if (result.JobStatus === 'SUCCEEDED') {
+          // 완료 로깅
+          apiLogger.analysis.completed('FaceDetection', jobId, awsDuration2, req.requestId);
+        }
+        
+        // AWS 성공 로깅
+        apiLogger.aws.success('Rekognition', 'getFaceDetection', {
+          status: result.JobStatus,
+          faceCount: result.Faces ? result.Faces.length : 0
+        }, req.requestId, awsDuration2);
+        
         break;
 
       case 'segment':
+        // AWS Rekognition 세그먼트 감지 상태 확인 로깅
+        apiLogger.aws.start('Rekognition', 'getSegmentDetection', { JobId: jobId }, req.requestId);
+        
+        const awsStartTime3 = Date.now();
         result = await rekognition.getSegmentDetection({ JobId: jobId }).promise();
+        const awsDuration3 = Date.now() - awsStartTime3;
+        
         status = {
           jobId: jobId,
           status: result.JobStatus,
           videoMetadata: result.VideoMetadata,
           segments: result.Segments ? result.Segments.slice(0, 10) : [] // 처음 10개만
         };
+        
+        if (result.JobStatus === 'SUCCEEDED') {
+          // 완료 로깅
+          apiLogger.analysis.completed('SegmentDetection', jobId, awsDuration3, req.requestId);
+        }
+        
+        // AWS 성공 로깅
+        apiLogger.aws.success('Rekognition', 'getSegmentDetection', {
+          status: result.JobStatus,
+          segmentCount: result.Segments ? result.Segments.length : 0
+        }, req.requestId, awsDuration3);
+        
         break;
 
       default:
+        logger.warn('⚠️ 지원하지 않는 작업 타입', {
+          requestId: req.requestId,
+          jobType,
+          supportedTypes: ['stt', 'face', 'segment']
+        });
+        
         return res.status(400).json({
           success: false,
           error: '지원하지 않는 작업 타입',
           supportedTypes: ['stt', 'face', 'segment'],
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          requestId: req.requestId
         });
     }
 
-    console.log(`✅ [${jobType.toUpperCase()}] 상태 확인 완료:`, status.status);
+    const totalDuration = Date.now() - startTime;
+    
+    logger.info(`✅ ${jobType.toUpperCase()} 상태 확인 완료`, {
+      requestId: req.requestId,
+      jobId,
+      status: status.status,
+      totalDuration: `${totalDuration}ms`
+    });
 
     res.json({
       success: true,
       jobType: jobType,
       result: status,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      requestId: req.requestId
     });
 
   } catch (error) {
-    console.error(`💥 [${req.params.jobType.toUpperCase()}] 상태 확인 실패:`, error);
+    const duration = Date.now() - startTime;
+    
+    logger.error(`💥 ${req.params.jobType.toUpperCase()} 상태 확인 실패`, {
+      requestId: req.requestId,
+      jobId: req.params.jobId,
+      error: error.message,
+      code: error.code,
+      duration: `${duration}ms`
+    });
+    
+    // 분석 실패 로깅
+    apiLogger.analysis.failed(req.params.jobType, req.params.jobId, error, req.requestId);
+    
     res.status(500).json({
       success: false,
-      error: '작업 상태 확인 실패',
+      error: '상태 확인 실패',
       message: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      requestId: req.requestId
     });
   }
 });

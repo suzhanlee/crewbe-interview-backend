@@ -180,3 +180,47 @@ AWS IAM 사용자에게 다음 권한이 필요합니다:
 ## 라이선스
 
 MIT License
+
+## 🔧 핵심 기능
+
+### API 로깅 시스템 📝
+
+프로젝트에는 Winston을 기반으로 한 **상세한 로깅 시스템**이 구축되어 있습니다:
+
+#### 로깅 레벨
+- **ERROR**: 시스템 에러, AWS 호출 실패
+- **WARN**: 경고 사항 (파일 없음, 잘못된 요청 등)
+- **INFO**: 일반 정보 (API 호출, 작업 완료 등)
+- **HTTP**: HTTP 요청/응답 로깅
+- **DEBUG**: 디버깅 정보
+
+#### 로그 파일 구조
+```
+logs/
+├── combined.log     # 모든 로그 (10MB x 10개 파일)
+├── error.log        # 에러만 (10MB x 5개 파일)
+└── api.log          # API 관련 로그 (10MB x 5개 파일)
+```
+
+#### 추적 가능한 로깅 기능
+✅ **요청 ID 추적**: 모든 API 요청에 고유 ID 부여  
+✅ **응답 시간 측정**: 각 API 호출의 정확한 소요 시간  
+✅ **AWS 서비스 호출 로깅**: 모든 AWS SDK 호출 상세 추적  
+✅ **에러 스택 추적**: 상세한 에러 정보와 스택 트레이스  
+✅ **시스템 메트릭**: 메모리 사용량, 시스템 정보  
+✅ **구조화된 JSON 로깅**: 검색과 분석이 용이한 JSON 형태
+
+#### 로깅 예시
+```json
+{
+  "timestamp": "2025-06-05 11:13:25",
+  "level": "INFO",
+  "message": "🔧 AWS S3 getSignedUrlPromise Started",
+  "requestId": "p71zorkd5hn25c825wqb2y",
+  "service": "S3",
+  "operation": "getSignedUrlPromise",
+  "duration": "5ms"
+}
+```
+
+### API 엔드포인트
